@@ -89,6 +89,8 @@ This was performed in Google Earth Engine using the following process:
     \item MODIS PET, provided as 8-day composites, was also aggregated into monthly sums and rescaled by a factor of 0.1 to derive total monthly Potential Evapotranspiration ($PET_i$).
     \item The monthly difference ($D_i$) was computed and exported as 240 individual GeoTIFF files, one for each month in the study period.
 \end{itemize}
+A key pre-processing step within GEE involves harmonizing the spatial resolutions of the two datasets. The CHIRPS precipitation data has a native resolution of $0.05^{\circ}$ (approximately 5.5 km), while the MODIS PET product is provided at a much finer 500m resolution. To ensure a valid pixel-wise subtraction, the MODIS PET data was resampled to match the coarser resolution of the CHIRPS data. This was achieved using a mean reducer during the aggregation process in GEE, ensuring that the final P-PET calculation was performed on a consistent grid.
+
 The GEE script for this export is available externally.
 \begin{center}
     \textit{The GEE script can be found at: \href{https://github.com/Actuallyanonymous/spei-drought-analysis-pipeline/blob/main/scripts/01_gee_export_pp-et.py}{01\_gee\_export\_pp-et.py}}
@@ -103,9 +105,9 @@ The standardization process transforms the raw, location-specific water balance 
 Drought is a multi-scalar phenomenon. To capture this, the water balance data is first aggregated at different timescales by calculating a rolling sum. The aggregated series $D^k$ for a given month $n$ and timescale $k$ is:
 \[ D^k_n = \sum_{i=0}^{k-1} D_{n-i}, \quad k \in \{1, 3, 12\} \]
 \begin{itemize}
-    \item \textbf{SPEI-1 (k=1):} Reflects short-term monthly conditions, relevant for agricultural drought.
-    \item \textbf{SPEI-3 (k=3):} Reflects medium-term seasonal conditions, relevant for hydrological drought.
-    \item \textbf{SPEI-12 (k=12):} Reflects long-term annual conditions, relevant for water supply and major droughts.
+    \item \textbf{SPEI-1 (k=1):} Reflects short-term monthly conditions.
+    \item \textbf{SPEI-3 (k=3):} Reflects medium-term seasonal conditions.
+    \item \textbf{SPEI-12 (k=12):} Reflects long-term annual conditions.
 \end{itemize}
 
 \subsubsection{Fitting a Probability Distribution}
@@ -114,28 +116,42 @@ The aggregated water balance data ($D^k$) does not follow a normal (Gaussian) di
 where $\alpha$, $\beta$, and $\gamma$ are the scale, shape, and origin parameters, respectively, which are estimated from the data.
 
 \subsubsection{Parameter Estimation via the Method of L-moments}
-To find the optimal parameters ($\alpha, \beta, \gamma$) for the Log-Logistic curve, the `SPEI` package uses the **Method of L-moments**. This technique is statistically more robust than conventional moments (mean, variance, skewness) because it is calculated from linear combinations of the ordered data, making it far less sensitive to outliers. The process is as follows:
-\begin{enumerate}
-    \item The first three sample L-moments are calculated from the raw P-PET data series:
-    \begin{itemize}
-        \item $\lambda_1$: A measure of location (L-location).
-        \item $\lambda_2$: A measure of scale (L-scale).
-        \item $\tau_3$: A measure of skewness (L-skewness ratio).
-    \end{itemize}
-    \item The `SPEI` package then uses established mathematical formulas to directly derive the values of $\alpha$, $\beta$, and $\gamma$ from these calculated L-moments. This provides a robust fit that correctly handles the negative values present in the P-PET data.
-\end{enumerate}
+To find the optimal parameters ($\alpha, \beta, \gamma$) for the Log-Logistic curve, the `SPEI` package uses the **Method of L-moments**. This technique is statistically more robust than conventional moments because it is calculated from linear combinations of ordered data, making it far less sensitive to outliers. The process is as follows:
+
+\paragraph{1. Calculation of Sample L-moments:}
+For a given time series of data $x_1, x_2, ..., x_n$, the first three unbiased sample L-moments are calculated. This begins with probability weighted moments ($b_r$):
+\[ b_0 = \frac{1}{n} \sum_{i=1}^{n} x_{i:n} \]
+\[ b_1 = \frac{1}{n} \sum_{i=2}^{n} \frac{(i-1)}{(n-1)} x_{i:n} \]
+\[ b_2 = \frac{1}{n} \sum_{i=3}^{n} \frac{(i-1)(i-2)}{(n-1)(n-2)} x_{i:n} \]
+where $x_{i:n}$ is the $i$-th value in the ordered (sorted) sample. These are then used to find the L-moments:
+\begin{itemize}
+    \item \textbf{L-location:} $\lambda_1 = b_0$
+    \item \textbf{L-scale:} $\lambda_2 = 2b_1 - b_0$
+    \item \textbf{L-moment 3:} $\lambda_3 = 6b_2 - 6b_1 + b_0$
+    \item \textbf{L-skewness:} $\tau_3 = \lambda_3 / \lambda_2$
+\end{itemize}
+
+\paragraph{2. Deriving Log-Logistic Parameters from L-moments:}
+The `SPEI` package then uses these calculated L-moments to solve for the distribution parameters. The shape parameter, $\beta$, is found by numerically solving the following equation that relates it to L-skewness:
+\[ \tau_3 = \frac{1 - 3(2^{-1/\beta}) + 2(3^{-1/\beta})}{1 - 2^{-1/\beta}} \]
+Once $\beta$ is known, the scale ($\alpha$) and origin ($\gamma$) parameters are calculated directly:
+\[ \alpha = \frac{\lambda_2 \beta \sin(\pi/\beta)}{\pi} \]
+\[ \gamma = \lambda_1 - \alpha \left(\frac{\pi/\beta}{\sin(\pi/\beta)}\right) \]
+This process provides a robust fit that correctly handles the negative values present in the P-PET data.
 
 \subsubsection{Final Standardization to a Z-score}
 The final step is to convert the fitted probability into a universal index.
 \begin{enumerate}
     \item The CDF of the fitted Log-Logistic curve, $F(x)$, is used to find the cumulative probability $P$ of a given water balance value.
-    \item This probability $P$ is then transformed into a standard normal variable (a Z-score) using the inverse of the standard normal CDF, also known as the quantile function ($\Phi^{-1}$). This function asks, "On a perfect bell curve, what Z-score corresponds to this probability/percentile?"
+    \item This probability $P$ is then transformed into a standard normal variable (a Z-score) using the inverse of the standard normal CDF, also known as the quantile function ($\Phi^{-1}$).
     \[ \text{SPEI} = \Phi^{-1}(P) \]
     This final Z-score is the SPEI value, where a value of 0 is perfectly average, negative values indicate drought, and positive values indicate wetness.
 \end{enumerate}
 
+\newpage
+
 \subsubsection{Implementation Process}
-The R script automates this entire process. It loads the 240 P-PET images into a raster brick and uses a robust, block-processing method to apply a function to each pixel. This function converts the pixel's 20-year history into a time series and uses the `spei()` function to perform the entire calculation (L-moment fitting, CDF calculation, and standardization) for SPEI-1, SPEI-3, and SPEI-12. The script then saves the results as properly georeferenced GeoTIFF files.
+The R script automates this entire process. It loads the 240 P-PET images into a raster brick and uses a robust, block-processing method to apply a function to each pixel. This function uses the `spei()` function from the `SPEI` package to perform the entire calculation (L-moment fitting, CDF calculation, and standardization) and saves the results as properly georeferenced GeoTIFF files.
 \begin{center}
     \textit{The full R script can be found at: \href{https://github.com/Actuallyanonymous/spei-drought-analysis-pipeline/blob/main/scripts/02_calculate_spei.R}{02\_calculate\_spei.R}}
 \end{center}
@@ -147,11 +163,9 @@ Selected SPEI images were uploaded as assets to Google Earth Engine for visualiz
 \end{center}
 
 \subsection{Result Verification Example}
-The multi-scalar nature of SPEI allows for a comprehensive analysis of drought events. The year \textbf{2015} serves as an excellent case study. The SPEI-1 for June 2015 (Figure \ref{fig:2015_results}a) indicates significant drought conditions at the beginning of the year.
+The multi-scalar nature of SPEI allows for a comprehensive analysis of drought events. The year \textbf{2015} serves as an excellent case study. The SPEI-1 for June 2015 (Figure \ref{fig:2015_results}a) indicates that significant short-term drought conditions were already present heading into the main monsoon season. However, the SPEI-3 for the core monsoon period of July-September (Figure \ref{fig:2015_results}b) shows a period of near-normal conditions, demonstrating how seasonal rainfall can temporarily mask a longer-term issue.
 
-However, the SPEI-3 for the monsoon season of July-September (Figure \ref{fig:2015_results}b) shows a period of near-normal or even slightly wet conditions. This can be attributed to monsoon rainfall temporarily alleviating the water deficit.
-
-Despite the mid-year relief, the SPEI-12 for the entire calendar year (Figure \ref{fig:2015_results}c) reveals a severe to extreme drought, confirming that the annual water balance was overwhelmingly negative. This aligns with ground reports from news articles \cite{sandrp2015} and government reports \cite{dpd2015}. This demonstrates the pipeline's ability to capture both short-term variations and the overarching annual drought severity.
+Despite this mid-year relief, the SPEI-12 for the entire calendar year (Figure \ref{fig:2015_results}c) reveals a severe to extreme drought, confirming that the annual water balance was overwhelmingly negative. This aligns perfectly with ground reports from news articles \cite{sandrp2015} and government reports \cite{dpd2015}. This comparison validates the pipeline's ability to capture both short-term variations and the overarching annual drought severity.
 
 \begin{figure}[h!]
     \centering
@@ -206,3 +220,4 @@ Department of Computer Science and Engineering \\
 Indian Institute of Technology Delhi
 
 \end{document}
+
