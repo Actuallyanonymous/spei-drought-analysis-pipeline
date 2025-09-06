@@ -9,7 +9,7 @@
 \usepackage{booktabs} % For better table rules
 \usepackage{caption}
 \usepackage{subcaption} % For arranging figures
-\usepackage{xcolor}   % For colors in tables and text
+\usepackage{xcolor}     % For colors in tables and text
 \usepackage{listings} % For code blocks
 \usepackage{hyperref}
 \usepackage[style=numeric, sorting=none, backend=biber]{biblatex}
@@ -38,36 +38,9 @@
 % Spacing
 \onehalfspacing
 
-% Code listing style
-\definecolor{codegreen}{rgb}{0,0.6,0}
-\definecolor{codegray}{rgb}{0.5,0.5,0.5}
-\definecolor{codepurple}{rgb}{0.58,0,0.82}
-\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
-
-\lstdefinestyle{mystyle}{
-    backgroundcolor=\color{backcolour},   
-    commentstyle=\color{codegreen},
-    keywordstyle=\color{magenta},
-    numberstyle=\tiny\color{codegray},
-    stringstyle=\color{codepurple},
-    basicstyle=\ttfamily\footnotesize,
-    breakatwhitespace=false,         
-    breaklines=true,                 
-    captionpos=b,                    
-    keepspaces=true,                 
-    numbers=left,                    
-    numbersep=5pt,                  
-    showspaces=false,                
-    showstringspaces=false,
-    showtabs=false,                  
-    tabsize=2
-}
-\lstset{style=mystyle}
-
-
 % ~~~~~~~~~~ Title and Author ~~~~~~~~~~
 \title{\huge\textbf{SPEI Computation and Visualization Pipeline}}
-\author{\large\textbf{Pushkin Mangla} \\ \normalsize{Department of Computer Science and Engineering, IIT Delhi}}
+\author{\large Pushkin Mangla \\ \large Department of Computer Science and Engineering, IIT Delhi}
 \date{}
 
 % ~~~~~~~~~~ Document Begins ~~~~~~~~~~
@@ -78,7 +51,7 @@
 \newpage
 
 \begin{abstract}
-    \noindent This document presents a complete pipeline for calculating and visualizing the \textbf{SPEI (Standardized Precipitation Evapotranspiration Index)}, a tool for drought assessment. The methodology is built upon open-access geospatial datasets, including precipitation (\textbf{P}) data from \textbf{CHIRPS} and Potential Evapotranspiration (\textbf{PET}) data from \textbf{MODIS}. This work is contextualized within broader efforts to build digital public goods for climate resilience, such as the CORE Stack initiative \cite{seth2024core}.
+    \noindent This document presents a complete pipeline for calculating and visualizing the \textbf{SPEI (Standardized Precipitation Evapotranspiration Index)}, a critical tool for drought assessment. The methodology is built upon open-access geospatial datasets, including precipitation (\textbf{P}) data from \textbf{CHIRPS} and Potential Evapotranspiration (\textbf{PET}) data from \textbf{MODIS}. This work is contextualized within broader efforts to build digital public goods for climate resilience, such as the CORE Stack initiative \cite{seth2024core}.
     \newline\newline
     As a case study, this documentation details an analysis for the state of Madhya Pradesh, India, for the years 2004-2023. The primary objective is to assess drought conditions at monthly, seasonal, and annual scales using \textbf{SPEI-1}, \textbf{SPEI-3}, and \textbf{SPEI-12}, respectively.
 \end{abstract}
@@ -96,131 +69,96 @@
         \addlinespace
         \textbf{MODIS MOD16A2GF v6.1} \newline 8-day Potential Evapotranspiration (PET) from MODIS & \href{https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MOD16A2GF}{MODIS PET - Earth Engine} \\
         \addlinespace
-        \textbf{FAO GAUL} \newline Administrative boundaries of Indian states & \href{https://developers.google.com/earth-engine/datasets/catalog/FAO_GAUL_2015_level1}{FAO/GAUL/2015 - Earth Engine} \\
+        \textbf{FAO GAUL} \cite{fao2015gaul} \newline Administrative boundaries of Indian states & \href{https://developers.google.com/earth-engine/datasets/catalog/FAO_GAUL_2015_level1}{FAO/GAUL/2015 - Earth Engine} \\
         \bottomrule
     \end{tabular}
 \end{table}
 
 \section{Study Area}
-The area of interest is \textbf{Madhya Pradesh}, extracted using the FAO/GAUL boundaries dataset by filtering for ADM0\_NAME = India and ADM1\_NAME = Madhya Pradesh. All analysis and exports are spatially clipped to this region.
+The area of interest is \textbf{Madhya Pradesh}, extracted using the FAO/GAUL boundaries dataset \cite{fao2015gaul} by filtering for ADM0\_NAME = India and ADM1\_NAME = Madhya Pradesh. All analysis and exports are spatially clipped to this region.
 
 \section{Methodology}
+The pipeline is divided into three main stages: data preparation in Google Earth Engine (GEE), core statistical processing in R, and final visualization in GEE.
 
 \subsection{Step 1: Computation of Monthly P - PET}
-For each month from January, 2004 - December, 2023, the climatic water balance for each pixel in Madhya Pradesh was calculated as:
+The foundation of the SPEI is the climatic water balance ($D$), calculated as the difference between Precipitation (P) and Potential Evapotranspiration (PET). For each month $i$ from January 2004 to December 2023, the water balance for each pixel was calculated as:
 \[ D_i = P_i - PET_i \]
-where $D_i$ is the water balance (P-PET) for month $i$.
-
+This was performed in Google Earth Engine using the following process:
 \begin{itemize}
-    \item CHIRPS data was aggregated daily into monthly sums for Precipitation ($P_i$).
-    \item MODIS PET (8-day composites) was also summed for each month and rescaled using a factor of 0.1 to get Potential Evapotranspiration ($PET_i$).
-    \item The monthly difference ($D_i$) was computed in Google Earth Engine and exported as GeoTIFF files.
+    \item CHIRPS daily data was aggregated into monthly sums to derive total monthly Precipitation ($P_i$).
+    \item MODIS PET, provided as 8-day composites, was also aggregated into monthly sums and rescaled by a factor of 0.1 to derive total monthly Potential Evapotranspiration ($PET_i$).
+    \item The monthly difference ($D_i$) was computed and exported as 240 individual GeoTIFF files, one for each month in the study period.
 \end{itemize}
-
-\textit{\{During this process, as the resolution for CHIRPS P data is $0.05^{\circ}$ and MODIS PET is 500m, the MODIS PET resolution was resampled to $5.5km \approx 0.05^{\circ}$ to match. This was validated as acceptable using the Global Moran's I statistic.\}}
-
-The code for the export of these 240 .tif images is available externally.
-
+The GEE script for this export is available externally.
 \begin{center}
     \textit{The GEE script can be found at: \href{https://github.com/Actuallyanonymous/spei-drought-analysis-pipeline/blob/main/scripts/01_gee_export_pp-et.py}{01\_gee\_export\_pp-et.py}}
 \end{center}
 
+\subsection{Step 2: SPEI Standardization in R}
+The core of the SPEI calculation was performed in the R programming language, following the exact methodology of the IIT Gandhinagar paper \cite{mishra2023spei} to ensure scientific rigor and consistency. We utilized the official \textbf{`SPEI` package} for R, which is the global standard for this analysis and is used by resources such as the SPEI Global Drought Monitor \cite{spei_csic}.
 
-\subsection{Step 2: SPEI Standardization in Python}
-Once the monthly water balance (P-PET) rasters were generated, the time series for each pixel was standardized to compute the SPEI. This process transforms the raw water balance data into a standardized index where values represent deviations from a long-term average, making them comparable across different locations and times.
+The standardization process transforms the raw, location-specific water balance data ($D_i$) into a universal, comparable index. This is a multi-step statistical process.
 
-\subsubsection{Theoretical Background of SPEI Standardization}
-The core of the SPEI calculation is to fit a probability distribution to the time series of the water balance data ($D_i$), and then transform the resulting cumulative probabilities to a standard normal distribution. This methodology is based on the work of Vicente-Serrano et al. (2010) \cite{vicente2010multiscalar} and further information is available from the SPEI Global Drought Monitor \cite{spei_csic}.
+\subsubsection{Aggregation at Different Timescales}
+Drought is a multi-scalar phenomenon. To capture this, the water balance data is first aggregated at different timescales by calculating a rolling sum. The aggregated series $D^k$ for a given month $n$ and timescale $k$ is:
+\[ D^k_n = \sum_{i=0}^{k-1} D_{n-i}, \quad k \in \{1, 3, 12\} \]
+\begin{itemize}
+    \item \textbf{SPEI-1 (k=1):} Reflects short-term monthly conditions, relevant for agricultural drought.
+    \item \textbf{SPEI-3 (k=3):} Reflects medium-term seasonal conditions, relevant for hydrological drought.
+    \item \textbf{SPEI-12 (k=12):} Reflects long-term annual conditions, relevant for water supply and major droughts.
+\end{itemize}
 
+\subsubsection{Fitting a Probability Distribution}
+The aggregated water balance data ($D^k$) does not follow a normal (Gaussian) distribution; it is often skewed. Therefore, the simple Z-score formula (`(value-mean)/std\_dev`) cannot be used. Instead, a more flexible, three-parameter \textbf{Log-Logistic} probability distribution is fitted to the time series of the aggregated data, as validated by numerous studies \cite{vicente2010multiscalar, stagge2015candidate}. The Cumulative Distribution Function (CDF) for this distribution is given by:
+\[ F(x) = \left[1 + \left(\frac{\alpha}{x-\gamma}\right)^\beta\right]^{-1} \]
+where $\alpha$, $\beta$, and $\gamma$ are the scale, shape, and origin parameters, respectively, which are estimated from the data.
+
+\subsubsection{Parameter Estimation via the Method of L-moments}
+To find the optimal parameters ($\alpha, \beta, \gamma$) for the Log-Logistic curve, the `SPEI` package uses the **Method of L-moments**. This technique is statistically more robust than conventional moments (mean, variance, skewness) because it is calculated from linear combinations of the ordered data, making it far less sensitive to outliers. The process is as follows:
 \begin{enumerate}
-    \item \textbf{Aggregation at Different Timescales:} The water balance data is first aggregated at different time scales to calculate SPEI for different purposes. For example, to calculate SPEI-3 (seasonal drought), a 3-month moving average of the $D_i$ series is computed.
-    \[ D^k_n = \sum_{i=0}^{k-1} D_{n-i} \]
-    where $k$ is the timescale (e.g., 1, 3, or 12 months) and $n$ is the calculation month.
+    \item The first three sample L-moments are calculated from the raw P-PET data series:
+    \begin{itemize}
+        \item $\lambda_1$: A measure of location (L-location).
+        \item $\lambda_2$: A measure of scale (L-scale).
+        \item $\tau_3$: A measure of skewness (L-skewness ratio).
+    \end{itemize}
+    \item The `SPEI` package then uses established mathematical formulas to directly derive the values of $\alpha$, $\beta$, and $\gamma$ from these calculated L-moments. This provides a robust fit that correctly handles the negative values present in the P-PET data.
+\end{enumerate}
 
-    \item \textbf{Fitting a Probability Distribution:} For each pixel, the time series of aggregated water balance values ($D^k$) is fitted to a probability distribution. While the original paper suggests a three-parameter log-logistic distribution, this pipeline uses the \textbf{Generalized Logistic (genlogistic)} distribution from SciPy, which is well-suited for modeling hydrological data that can be skewed. The Probability Density Function (PDF) is given by:
-    \[ f(x) = \frac{c e^{-z}}{\sigma (1+e^{-z})^{c+1}} \quad \text{where} \quad z = \frac{x-\mu}{\sigma} \]
-    Here, $\mu$ is the location parameter, $\sigma$ is the scale parameter, and $c$ is the shape parameter. These parameters are estimated from the data series for each pixel.
-
-    \item \textbf{Calculating Cumulative Probability:} Using the fitted parameters, the cumulative distribution function (CDF) is used to calculate the probability of observing a given water balance value, $F(x)$.
-    \[ F(x) = \left(1+e^{-z}\right)^{-c} \]
-
-    \item \textbf{Standardization:} The final step is to transform the cumulative probability $F(x)$ into a standard normal variable (Z-score) with a mean of zero and a standard deviation of one. This Z-score is the SPEI value. This is achieved by using the inverse of the standard normal CDF, also known as the quantile function ($\Phi^{-1}$).
-    \[ SPEI = \Phi^{-1}(F(x)) = \text{norm.ppf}(F(x)) \]
-    The resulting SPEI values are standardized and can be interpreted as the number of standard deviations a given water balance value deviates from the long-term mean.
+\subsubsection{Final Standardization to a Z-score}
+The final step is to convert the fitted probability into a universal index.
+\begin{enumerate}
+    \item The CDF of the fitted Log-Logistic curve, $F(x)$, is used to find the cumulative probability $P$ of a given water balance value.
+    \item This probability $P$ is then transformed into a standard normal variable (a Z-score) using the inverse of the standard normal CDF, also known as the quantile function ($\Phi^{-1}$). This function asks, "On a perfect bell curve, what Z-score corresponds to this probability/percentile?"
+    \[ \text{SPEI} = \Phi^{-1}(P) \]
+    This final Z-score is the SPEI value, where a value of 0 is perfectly average, negative values indicate drought, and positive values indicate wetness.
 \end{enumerate}
 
 \subsubsection{Implementation Process}
-The theoretical steps above are implemented in Python as follows:
-\begin{enumerate}
-    \item Stack 240 monthly images using \texttt{rasterio}.
-    \item Apply rolling sums over 1-month, 3-month, and 12-month windows.
-    \item For each pixel's time series, fit the Generalized Logistic Distribution using \texttt{scipy.stats.genlogistic.fit}.
-    \item Transform the resulting CDF values into a standard normal (Z-score) distribution using \texttt{scipy.stats.norm.ppf}.
-\end{enumerate}
-
-The Python code for this standardization is available externally.
+The R script automates this entire process. It loads the 240 P-PET images into a raster brick and uses a robust, block-processing method to apply a function to each pixel. This function converts the pixel's 20-year history into a time series and uses the `spei()` function to perform the entire calculation (L-moment fitting, CDF calculation, and standardization) for SPEI-1, SPEI-3, and SPEI-12. The script then saves the results as properly georeferenced GeoTIFF files.
 \begin{center}
-    \textit{The full script can be found at: \href{https://github.com/Actuallyanonymous/spei-drought-analysis-pipeline/blob/main/scripts/02_calculate_spei.py}{02\_calculate\_spei.py}}
+    \textit{The full R script can be found at: \href{https://github.com/Actuallyanonymous/spei-drought-analysis-pipeline/blob/main/scripts/02_calculate_spei.R}{02\_calculate\_spei.R}}
 \end{center}
 
-
-\textbf{Output:}
-\begin{itemize}
-    \item \textbf{SPEI1\_001.tif to SPEI1\_240.tif:} Monthly SPEI-1 $\rightarrow$ 240 (12*20) images.
-    \item \textbf{SPEI3\_YYYY\_MM.tif:} Seasonal SPEI-3 (March, June, Sept, Dec of each year) $\rightarrow$ 80 (4*20) images.
-    \item \textbf{SPEI12\_YYYY\_tif:} Annual SPEI-12 (December only) $\rightarrow$ 20 (1*20) images.
-\end{itemize}
-\textbf{Total:} $240 + 80 + 20 = 340$ images for 20 years (17 for each year).
-
-\subsection{Step 3: Upload to Google Earth Engine}
-As the automation of uploading assets into GEE failed, only selected images were manually uploaded to visualize the results. For initial visualization, only a few images were uploaded on GEE. Each image was uploaded as an individual asset.
-
-\subsection{Step 4: Visualization and Z-score Normalization}
-All visualization was done in the Google Earth Engine Code Editor using the uploaded assets. We compared January/Seasonal/Annual values across years using a pixel-wise Z-score to identify anomalies:
-\[ Z = \frac{(\text{SPEI value} - \text{mean of all years})}{\text{std deviation of all years}} \]
-Here the mean and standard deviation were calculated for a window of 20 years (2004-2023). This window can remain fixed for further analysis. This method helped identify spatial drought anomalies in specific years.
-
-The GEE script for this visualization is available externally.
+\subsection{Step 3: Visualization in Google Earth Engine}
+Selected SPEI images were uploaded as assets to Google Earth Engine for visualization and validation.
 \begin{center}
-    \textit{The full script can be found at: \href{https://github.com/Actuallyanonymous/spei-drought-analysis-pipeline/blob/main/scripts/03_gee_visualize_spei.js}{03\_gee\_visualize\_spei.js}}
+    \textit{The full GEE script can be found at: \href{https://github.com/Actuallyanonymous/spei-drought-analysis-pipeline/blob/main/scripts/03_gee_visualize_spei.js}{03\_gee\_visualize\_spei.js}}
 \end{center}
-
-A diverse color palette was used to visualize the droughts clearly:
-\begin{table}[h!]
-    \centering
-    \caption{Z-SPEI Visualization Palette}
-    \begin{tabular}{llll}
-        \toprule
-        \textbf{Z-SPEI Range} & \textbf{Interpretation} & \textbf{Hex Code} & \textbf{Color Name (Approximate)} \\
-        \midrule
-        < -2 & Extreme Drought & \#8c2d04 & Dark Brown \\
-        -2 to -1.5 & Severe Drought & \#d94801 & Reddish Orange \\
-        -1.5 to -1 & Moderate Drought & \#f16913 & Orange \\
-        -1 to -0.5 & Mild Drought & \#fdae6b & Light Orange/Peach \\
-        -0.5 to 0 & Slightly Drier & \#fdd0a2 & Pale Peach/Sand \\
-        $\approx$ 0 & Normal & \#f7f7f7 & Very Light Gray/Off-White \\
-        0 to 0.5 & Slightly Wetter & \#d4e6f5 & Pale Blue \\
-        0.5 to 1 & Mild Wetness & \#92c5de & Light Blue \\
-        1 to 1.5 & Moderate Wetness & \#4393c3 & Medium Blue \\
-        1.5 to 2 & Severe Wetness & \#2166ac & Deep Blue \\
-        > 2 & Extremely Wet & \#053061 & Navy Blue/Very Dark Blue \\
-        \bottomrule
-    \end{tabular}
-\end{table}
 
 \subsection{Result Verification Example}
-The multi-scalar nature of SPEI allows for a comprehensive analysis of drought events. The year \textbf{2015} serves as an excellent case study. The SPEI-1 for January 2015 (Figure \ref{fig:2015_results}a) indicates significant drought conditions at the beginning of the year.
+The multi-scalar nature of SPEI allows for a comprehensive analysis of drought events. The year \textbf{2015} serves as an excellent case study. The SPEI-1 for June 2015 (Figure \ref{fig:2015_results}a) indicates significant drought conditions at the beginning of the year.
 
-However, the SPEI-3 for the monsoon season of July-September (Figure \ref{fig:2015_results}b) shows a period of near-normal or even slightly wet conditions. This can be attributed to monsoon rainfall temporarily alleviating the water deficit, coupled with lower PET during this period.
+However, the SPEI-3 for the monsoon season of July-September (Figure \ref{fig:2015_results}b) shows a period of near-normal or even slightly wet conditions. This can be attributed to monsoon rainfall temporarily alleviating the water deficit.
 
-Despite the mid-year relief, the SPEI-12 for the entire calendar year (Figure \ref{fig:2015_results}c) reveals a severe to extreme drought, confirming that the annual water balance was overwhelmingly negative. This aligns with ground reports: on \textbf{Oct 26, 2015}, Madhya Pradesh officially declared a drought in 33,283 villages, affecting 4.4 million hectares and 4.8 million farmers, as documented by the South Asia Network on Dams, Rivers and People \cite{sandrp2015} and the Directorate of Pulses Development \cite{dpd2015}. This demonstrates the pipeline's ability to capture both short-term variations and the overarching annual drought severity.
+Despite the mid-year relief, the SPEI-12 for the entire calendar year (Figure \ref{fig:2015_results}c) reveals a severe to extreme drought, confirming that the annual water balance was overwhelmingly negative. This aligns with ground reports from news articles \cite{sandrp2015} and government reports \cite{dpd2015}. This demonstrates the pipeline's ability to capture both short-term variations and the overarching annual drought severity.
 
 \begin{figure}[h!]
     \centering
     \begin{subfigure}[b]{0.48\textwidth}
         \centering
-        \includegraphics[width=\textwidth]{spei_jan_2015.png}
-        \caption{SPEI-1 for January 2015, showing initial drought conditions.}
+        \includegraphics[width=\textwidth]{spei_june_2015.png}
+        \caption{SPEI-1 for June 2015, showing initial drought conditions.}
         \label{fig:2015_jan}
     \end{subfigure}
     \hfill
@@ -249,24 +187,22 @@ Despite the mid-year relief, the SPEI-12 for the entire calendar year (Figure \r
 \printbibliography
 
 \vspace{1cm}
-\noindent \textbf{NOTE:} The SPEI-12 here is measured for the calendar year. This can be changed to an agricultural year as per requirements.
+\noindent \textbf{NOTE:} The SPEI-12 here is measured for the calendar year. This can be changed to an
+agricultural year as per requirements.
 
-\vfill % This command pushes the following content to the bottom of the page
+\newpage
 
-\begin{flushleft}
-\hrule
-\vspace{0.5cm}
 \noindent This pipeline was developed and implemented by: \\
 \textbf{Pushkin Mangla} \\
-\textit{B.Tech-M.Tech Dual Degree Student} \\
-\textit{Department of Computer Science and Engineering, Class of 2029} \\
-\textit{Indian Institute of Technology Delhi}
-\vspace{0.5cm}
+B.Tech.-M.Tech. Dual Degree Student \\
+Department of Computer Science and Engineering, Class of 2029 \\
+Indian Institute of Technology Delhi
+
+\vspace{1cm}
 
 \noindent Under the academic supervision of: \\
 \textbf{Prof. Aaditeshwar Seth} \\
-\textit{Department of Computer Science and Engineering} \\
-\textit{Indian Institute of Technology Delhi}
-\end{flushleft}
+Department of Computer Science and Engineering \\
+Indian Institute of Technology Delhi
 
 \end{document}
