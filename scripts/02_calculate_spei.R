@@ -18,8 +18,8 @@ library(ncdf4)
 library(lubridate)
 
 # --- Step 2: Configuration ---
-input_folder <- "/content/drive/MyDrive/SPEI_Data_AP"
-output_folder <- "/content/drive/MyDrive/SPEI_OUTPUTS_AP_R_Corrected_Final"
+input_folder <- "/content/drive/MyDrive/SPEI_Data_MP"
+output_folder <- "/content/drive/MyDrive/SPEI_OUTPUTS_MP_R_Corrected_Final"
 if (!dir.exists(output_folder)) {
   dir.create(output_folder, recursive = TRUE)
 }
