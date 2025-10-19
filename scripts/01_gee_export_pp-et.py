@@ -16,7 +16,7 @@ ee.Initialize(project='cs5-pushkinmangla') # Replace with your GEE project ID
 state_name = 'Madhya Pradesh'
 
 # Define the folder in your Google Drive to save the output files
-drive_folder_name = 'SPEI_Data_MP' # Changed from 'SPEI_Data_AP' for consistency
+drive_folder_name = 'SPEI_Data_MP'
 
 # Define the date range for the data
 start_year = 2004
@@ -42,10 +42,9 @@ def submit_export(year, month):
 
     # Calculate total monthly PET in mm and set its native projection
     PET = modis.filterDate(start_date, end_date).sum().multiply(0.1).rename('PET').setDefaultProjection(modis.first().projection())
-
-    # --- THIS IS THE FIXED LINE ---
+    
     # Resample PET to match P's scale by taking the mean.
-    # The maxPixels limit is increased to prevent the "Too many input pixels" error.
+    # The maxPixels limit can be increased to prevent the "Too many input pixels" error.
     PET_resampled_mean = PET.reduceResolution(reducer=ee.Reducer.mean(), maxPixels=65536).reproject(crs=P.projection())
 
     # Calculate the water balance (P - PET) using the resampled PET
