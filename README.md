@@ -1,89 +1,231 @@
-# SPEI Drought Analysis Pipeline  
-*A Scalable Workflow for Drought Monitoring using Google Earth Engine & Python*  
+# SPEI Drought Analysis Pipeline
+
+A scalable pipeline for computing and uploading **Standardized Precipitation 
+Evapotranspiration Index (SPEI)** rasters to Google Earth Engine, designed for 
+pan-India forest drought monitoring.
+
+Built at IIT Delhi under Prof. Aaditeshwar Seth (ICTD Lab / Core Stack).
 
 ---
 
-## Overview  
-This repository provides a **complete pipeline for computing and visualizing the Standardized Precipitation Evapotranspiration Index (SPEI)** for drought monitoring.  
-The workflow integrates **Google Earth Engine (GEE)** and **Python** to process open-access datasets (**CHIRPS Precipitation** and **MODIS PET**) into meaningful drought indicators.
+## Important note on this repository
 
-The pipeline is demonstrated through a **case study on Madhya Pradesh, India (2004–2023)**, but it is **fully scalable** for other regions.
+The `/paper` folder contains the technical report and methodology documentation.
+**You do not need to read it to run the pipeline.** Refer to it only if you want 
+the research backing for the SPEI methodology, dataset choices, or parameter 
+justifications.
+
+Everything you need to run the pipeline end-to-end is in `/scripts`.
 
 ---
 
-## Repository Structure  
-├── /scripts
-│ ├── 01_gee_export_pp-et.py # GEE script to compute & export monthly P-PET
-│ ├── 02_calculate_spei.py # Python script to compute SPEI (SPEI-1, SPEI-3, SPEI-12)
-│ └── 03_gee_visualize_spei.js # GEE script for SPEI visualization (Z-score anomaly maps)
+## What this pipeline does
+
+Takes you from raw climate datasets to analysis-ready SPEI assets in GEE:
+
+CHIRPS (precipitation) + MODIS (PET)
+↓  [GEE export]
+Monthly P-PET multiband GeoTIFF
+↓  [R computation]
+SPEI-1, SPEI-3, SPEI-12 multiband GeoTIFFs
+↓  [earthengine CLI upload]
+GEE assets ready for analysis and visualization
+
+**Output per state:**
+- `SPEI1_{STATE}.tif` — 240 bands, one per month (Jan 2004 → Dec 2023)
+- `SPEI3_{STATE}.tif` — 80 bands, seasonal months only (Mar/Jun/Sep/Dec)
+- `SPEI12_{STATE}.tif` — 20 bands, one per year (December value)
+
+Band names follow the pattern `y2015_m06` (SPEI-1/3) or `y2015` (SPEI-12).
+
+---
+
+## SPEI methodology
+
+- **Index:** SPEI (Vicente-Serrano et al., 2010)
+- **Distribution:** log-Logistic
+- **Timescales:** 1-month, 3-month, 12-month
+- **Precipitation:** CHIRPS daily → aggregated monthly
+- **PET:** MODIS MOD16A2GF → aggregated monthly, resampled to CHIRPS resolution (5.5km)
+- **Period:** 2004–2023 (20 years, 240 months)
+
+---
+
+## Repository structure
+
+scripts/
+├── single_state/          ← Start here. Validate on one state before scaling.
+│   ├── 01_export_ppet_single_state.py
+│   ├── 02_compute_spei_single_state.R
+│   └── 03_upload_spei_asset_single_state.py
 │
-├── /paper
-│ ├── main.tex # Technical report (LaTeX)
-│ └── references.bib # Bibliography
-│
-├── README.md # Project documentation
+└── pan_india/             ← Run overnight once single_state is validated.
+├── 01_export_ppet_all_states.py
+├── 02_compute_spei_all_states.R
+└── 03_upload_spei_assets_all_states.py
+
+paper/                     ← Methodology reference only. Not needed to run pipeline.
 
 ---
 
-## Features  
-✔️ Compute **P – PET** from CHIRPS & MODIS PET  
-✔️ Standardize P – PET to **SPEI-1, SPEI-3, SPEI-12** using Python  
-✔️ Generate **interactive drought anomaly maps** in GEE  
-✔️ Scalable for **large temporal and spatial datasets**  
+## Prerequisites
+
+**Accounts:**
+- Google Earth Engine account with a project ID
+- Google Drive (intermediate storage for GeoTIFFs)
+
+**Python environment (Colab or local):**
+
+earthengine-api
+
+**R environment (lab machine recommended for CPU-heavy computation):**
+```r
+install.packages(c("SPEI", "raster", "lubridate"))
+```
+
+**GEE CLI (for asset uploads):**
+```bash
+pip install earthengine-api
+earthengine authenticate
+```
 
 ---
 
-## Requirements  
-- [Google Earth Engine](https://earthengine.google.com/) account  
-- Google Drive (for intermediate storage)  
-- **Python 3.x** with the following libraries:  
-  ```bash
-  earthengine-api geemap rasterio numpy scipy tqdm
+## Quick start — single state
 
+Run these three scripts in order. Each script has a `CONFIG` section at the top — 
+only edit that section.
 
-##Usage Guide:
+### Step 1 — Export P-PET from GEE (run in Colab)
 
-1. Export P–PET Data
-Run:
+Open `scripts/single_state/01_export_ppet_single_state.py`.
 
-scripts/01_gee_export_pp-et.py
+Set your config:
+```python
+state_name   = 'Madhya Pradesh'   # change this
+drive_folder = 'SPEI_Data_MP_v2'  # output folder on your Drive
+start_year   = 2004
+end_year     = 2023
+gee_project  = 'your-gee-project-id'
+```
 
-This will:
-✔ Initiate GEE tasks to compute monthly P–PET
-✔ Export GeoTIFFs to Google Drive
+Run the script. It submits **one GEE task** that exports a 240-band multiband 
+GeoTIFF to your Drive. Monitor progress in the GEE Code Editor → Tasks tab.
 
-2. Calculate SPEI
+**Expected time:** 20–40 minutes (GEE server-side, not your machine).
 
-Run :
-python 02_calculate_spei.py
+### Step 2 — Compute SPEI (run on lab machine)
 
-This generates SPEI-1, SPEI-3, SPEI-12 rasters.
+Once the Drive file appears, open `scripts/single_state/02_compute_spei_single_state.R`.
 
-3. Visualize SPEI Maps
-Upload SPEI rasters as GEE assets
-Run:
-scripts/03_gee_visualize_spei.js
+Set your config:
+```r
+input_file  <- "/path/to/Drive/SPEI_Data_MP_v2/P_PET_Madhya_Pradesh_multiband.tif"
+output_dir  <- "/path/to/Drive/SPEI_Outputs_MP_v2"
+```
 
-## Citation
-If you use this pipeline, please cite:
+Run the script. It reads the multiband P-PET file, computes SPEI pixel-wise using 
+the log-Logistic distribution, and writes three output files:
+- `SPEI1_Madhya_Pradesh.tif`
+- `SPEI3_Madhya_Pradesh.tif`
+- `SPEI12_Madhya_Pradesh.tif`
 
-bibtex
-Copy
-Edit
-@techreport{mangla2025spei,
-  title={SPEI Computation and Visualization Pipeline},
-  author={Mangla, Pushkin},
-  institution={Indian Institute of Technology Delhi},
-  year={2025},
-  note={Under the supervision of Prof. Aaditeshwar Seth}
-}
+**Expected time:** 30–90 minutes depending on state size and CPU. 
+The script prints chunk progress and skips states already processed if re-run.
 
+### Step 3 — Upload to GEE (run in Colab)
 
-## Author & Supervision
+Open `scripts/single_state/03_upload_spei_asset_single_state.py`.
 
-Author: Pushkin Mangla (IIT Delhi)
+Set your config:
+```python
+output_dir  = '/content/drive/MyDrive/SPEI_Outputs_MP_v2'
+state_safe  = 'Madhya_Pradesh'
+gee_project = 'projects/your-gee-project-id/assets/SPEI'
+```
 
-Supervisor: Prof. Aaditeshwar Seth (IIT Delhi)
+Run the script. It uploads all three SPEI files as named GEE assets with 
+properly named bands. Skips assets that already exist.
 
-##License :
-This project is licensed under the MIT License.
+---
+
+## Pan-India automation
+
+Once you have validated the pipeline on a single state, use the pan_india scripts 
+to run everything overnight.
+
+### Night 1 — Submit all GEE export tasks (Colab)
+
+Run `scripts/pan_india/01_export_ppet_all_states.py`.
+
+Edit the `SKIP_STATES` list to exclude states already processed:
+```python
+SKIP_STATES = ['Madhya Pradesh']  # already done
+```
+
+This submits one GEE task per state (up to 36), throttled to 30 concurrent tasks. 
+Leave it running. By morning all P-PET files will be on your Drive.
+
+### Night 2 — Compute SPEI for all states (lab machine)
+
+Run `scripts/pan_india/02_compute_spei_all_states.R` on the lab machine.
+```r
+input_dir  <- "/path/to/Drive/SPEI_Data_AllStates"
+output_dir <- "/path/to/Drive/SPEI_Outputs_AllStates"
+```
+
+The script loops over all state files, skips any already processed, and writes 
+three SPEI files per state. Leave it running overnight on the lab CPU.
+
+### Morning — Upload all assets (Colab)
+
+Run `scripts/pan_india/03_upload_spei_assets_all_states.py`.
+
+Uploads all SPEI-12 assets (and optionally SPEI-1/3) to GEE. Skips assets 
+that already exist. Takes ~5 minutes to submit all upload tasks.
+
+---
+
+## GEE asset structure after upload
+
+projects/{your-project}/assets/SPEI/
+├── SPEI12_Madhya_Pradesh      ← 20 bands: y2004, y2005, ..., y2023
+├── SPEI12_Maharashtra
+├── SPEI12_Rajasthan
+├── ...
+├── SPEI3_Madhya_Pradesh       ← 80 bands: y2004_m03, y2004_m06, ...
+└── SPEI1_Madhya_Pradesh       ← 240 bands: y2004_m01, y2004_m02, ...
+
+To use in GEE:
+```javascript
+// Load annual drought index for a specific year
+var spei12_mp = ee.Image('projects/{your-project}/assets/SPEI/SPEI12_Madhya_Pradesh');
+var drought_2015 = spei12_mp.select('y2015');
+```
+
+---
+
+## Troubleshooting
+
+**GEE task fails immediately:** Check that your AOI name matches exactly what's 
+in the FAO GAUL dataset. Some UTs have different spellings.
+
+**R script crashes midway:** Just re-run it. The `file.exists()` check means 
+it skips completed states and resumes from where it stopped.
+
+**Asset upload fails:** Make sure the GEE folder exists first:
+```bash
+earthengine create folder projects/{your-project}/assets/SPEI
+```
+
+**Band count mismatch:** If your P-PET file has fewer than 240 bands, the GEE 
+export may have partially failed. Delete the file from Drive and re-run Step 1.
+
+---
+
+## Acknowledgements
+
+Pipeline developed by Pushkin Mangla (IIT Delhi, 2024CS50081) under the 
+supervision of Prof. Aaditeshwar Seth, Department of CSE, IIT Delhi.
+
+Part of the Core Stack geospatial data framework for climate and forest monitoring.
