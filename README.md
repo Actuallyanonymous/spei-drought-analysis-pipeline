@@ -133,7 +133,7 @@ the log-Logistic distribution, and writes three output files:
 **Expected time:** 30–90 minutes depending on state size and CPU. 
 The script prints chunk progress and skips states already processed if re-run.
 
-### Step 3 — Upload to GEE (run in Colab)
+### Step 3 — Upload to GEE (run in Colab) -> Only do if asset of the spei images are needed for visualization or other usage
 
 Open `scripts/single_state/03_upload_spei_asset_single_state.py`.
 
