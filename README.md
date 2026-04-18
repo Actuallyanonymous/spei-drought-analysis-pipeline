@@ -51,6 +51,40 @@ Band names follow the pattern `y2015_m06` (SPEI-1/3) or `y2015` (SPEI-12).
 
 ---
 
+### Input datasets
+
+| Dataset | GEE Collection ID | Native resolution | Usage |
+|---|---|---|---|
+| CHIRPS Daily | `UCSB-CHG/CHIRPS/DAILY` | ~5.5km | Monthly precipitation (P) — daily images summed per month |
+| MODIS MOD16A2GF | `MODIS/061/MOD16A2GF` | ~500m | Monthly PET — 8-day composites summed per month, scaled ×0.1, resampled to CHIRPS resolution via mean reducer |
+| FAO GAUL Level 1 | `FAO/GAUL/2015/level1` | Vector | State boundary for AOI clipping only |
+
+**Resampling note:** MODIS PET is natively at ~500m. It is resampled to match
+CHIRPS resolution (~5.5km) using a mean reducer with `reduceResolution()` before
+the P-PET subtraction. The final exported P-PET and all SPEI outputs are at
+~5.5km resolution (CHIRPS native grid).
+
+### Citations
+
+**CHIRPS:** Funk, C., Peterson, P., Landsfeld, M., et al. (2015). The climate
+hazards infrared precipitation with stations — a new environmental record for
+monitoring extremes. *Scientific Data*, 2, 150066.
+https://doi.org/10.1038/sdata.2015.66
+
+**MODIS MOD16A2GF:** Running, S. W., Mu, Q., Zhao, M., & Moreno, A. (2019).
+MOD16A2GF MODIS/Terra Net Evapotranspiration Gap-Filled 8-Day L4 Global 500m
+SIN Grid V006. NASA EOSDIS Land Processes DAAC.
+https://doi.org/10.5067/MODIS/MOD16A2GF.006
+
+**SPEI index:** Vicente-Serrano, S. M., Beguería, S., & López-Moreno, J. I.
+(2010). A multiscalar drought index sensitive to global warming: the standardized
+precipitation evapotranspiration index. *Journal of Climate*, 23(7), 1696–1718.
+https://doi.org/10.1175/2009JCLI2909.1
+
+**FAO GAUL:** Food and Agriculture Organization of the United Nations (2015).
+Global Administrative Unit Layers (GAUL), level 1.
+https://data.apps.fao.org/catalog/dataset/gaul
+
 ## Repository structure
 
 scripts/
