@@ -13,7 +13,7 @@ drive.mount('/content/drive')
 
 # --- CONFIG ---
 state_safe  = 'Madhya_Pradesh'
-output_dir  = '/content/drive/MyDrive/SPEI_Outputs_AllStates'
+output_dir  = '/content/drive/MyDrive/SPEI_Outputs_SingleState'
 gee_folder  = 'projects/cs5-pushkinmangla/assets/SPEI'
 
 # --- Create GEE folder if it doesn't exist ---
