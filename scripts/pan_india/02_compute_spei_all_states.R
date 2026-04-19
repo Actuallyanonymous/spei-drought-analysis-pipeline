@@ -8,6 +8,10 @@
 #  !pip install rpy2==3.5.1
 #  %load_ext rpy2.ipython
 
+#then for installations needed for running the R script, you have to run these 
+#  %%R
+# install.packages(c("SPEI", "raster"), repos = "https://cran.r-project.org", quiet = TRUE)
+
 #and wrap the code in %%R , by just typing %%R at the beginning of the code below.
 # =============================================================================
 
