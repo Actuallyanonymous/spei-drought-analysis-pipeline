@@ -31,9 +31,9 @@ library(raster)
 # --- CONFIG ---
 state_safe  <- "Madhya_Pradesh"   # must match filename from Step 1
 input_file  <- file.path(
-                 "/content/drive/MyDrive/SPEI_Data_AllStates",
+                 "/content/drive/MyDrive/SPEI_Data_MP_v2",
                  paste0("P_PET_", state_safe, "_multiband.tif"))
-output_dir  <- "/content/drive/MyDrive/SPEI_Outputs_AllStates"
+output_dir  <- "/content/drive/MyDrive/SPEI_Outputs_MP_v2"
 
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
