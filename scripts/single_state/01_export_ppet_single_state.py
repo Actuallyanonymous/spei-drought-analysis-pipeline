@@ -15,7 +15,7 @@ ee.Initialize(project='cs5-pushkinmangla')
 
 # --- CONFIG ---
 state_name   = 'Madhya Pradesh'
-drive_folder = 'SPEI_Data_AllStates'
+drive_folder = 'SPEI_Data_SingleState'
 start_year   = 2004
 end_year     = 2023
 
