@@ -1,18 +1,28 @@
 # =============================================================================
-# SPEI Pipeline — Step 2 (Pan-India)
-# Loop over all state P-PET files, compute SPEI-1/3/12, save 3 files per state.
-# Resume-safe: skips states whose output already exists.
-
-#This is a direct R Script, to be run in lab machine (CPU Intensive) , if running in colab then please :
-# Do this :
-#  !pip install rpy2==3.5.1
-#  %load_ext rpy2.ipython
-
-#then for installations needed for running the R script, you have to run these 
-#  %%R
-# install.packages(c("SPEI", "raster"), repos = "https://cran.r-project.org", quiet = TRUE)
-
-#and wrap the code in %%R , by just typing %%R at the beginning of the code below.
+# SPEI Pipeline — Step 2 (Single State)
+# Read multiband P-PET GeoTIFF, compute SPEI-1/3/12 pixel-wise,
+# write 3 multiband output GeoTIFFs with named bands.
+#
+# HOW TO RUN:
+#
+# Option A — Lab machine (recommended for large states, no timeout risk):
+#   Rscript 02_compute_spei_all_states.R
+#
+# Option B — Google Colab:
+#   Cell 1 (Python):
+#     !pip install rpy2==3.5.1
+#     %load_ext rpy2.ipython
+#
+#   Cell 2 (install R packages, run once per session):
+#     %%R
+#     install.packages(c("SPEI", "raster"), repos="https://cran.r-project.org", quiet=TRUE)
+#
+#   Cell 3 (run this script):
+#     %%R
+#     [paste entire script below here]
+#
+# NOTE: Colab resets the R environment on each session restart.
+#       Re-run Cell 2 each time before running Cell 3.
 # =============================================================================
 
 library(SPEI)
