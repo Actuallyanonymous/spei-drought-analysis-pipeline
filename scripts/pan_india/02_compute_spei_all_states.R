@@ -2,7 +2,10 @@
 # SPEI Pipeline — Step 2 (Single State)
 # Read multiband P-PET GeoTIFF, compute SPEI-1/3/12 pixel-wise,
 # write 3 multiband output GeoTIFFs with named bands.
-#
+# Here the reference baseline period is taken as 2004-2023. 
+# Change the end_year variable to whatever year you wanna extend the pipeline to. 
+# If it is not intentional, don't touch the ref_start and ref_end variables for extending the pipeline as it will change the SPEI values for all 
+# previous years too. 
 # HOW TO RUN:
 #
 # Option A — Lab machine (recommended for large states, no timeout risk):
@@ -33,40 +36,61 @@ input_dir  <- "/path/to/GoogleDrive/SPEI_Data_AllStates"
 output_dir <- "/path/to/GoogleDrive/SPEI_Outputs_AllStates"
 if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
 
+# --- YEAR RANGE ---
+start_year   <- 2004
+end_year     <- 2023
+ref_start    <- 2004   # baseline period start — distribution fitted on this range
+ref_end      <- 2023   # baseline period end   — freeze this when extending to future years
+
+n_years    <- end_year - start_year + 1
+n_monthly  <- n_years * 12
+n_seasonal <- n_years * 4
+n_annual   <- n_years
+n_output   <- n_monthly + n_seasonal + n_annual
+
 # =============================================================================
 # SPEI FUNCTION — do not modify
-# Input:  240-length P-PET time series
-# Output: 340-length vector (SPEI-1 all: 240, SPEI-3 seasonal: 80, SPEI-12 annual: 20)
+# Input:  variable-length P-PET time series
+# Output: variable-length vector (SPEI-1 all: 12*(no. of uyears), SPEI-3 seasonal: 4 * (no. of years), SPEI-12 annual: no. of years)
 # =============================================================================
 spei_function <- function(x, ...) {
   tryCatch({
-    if (all(is.na(x))) return(rep(NA, 340))
+    if (all(is.na(x))) return(rep(NA, n_output))
 
-    pixel_ts <- ts(x, start = c(2004, 1), frequency = 12)
+    pixel_ts <- ts(x, start = c(start_year, 1), frequency = 12)
 
     spei1_all  <- as.vector(spei(pixel_ts, 1,
-                    distribution = 'log-Logistic', na.rm = TRUE)$fitted)
+                    distribution = 'log-Logistic',
+                    ref.start = c(ref_start, 1),
+                    ref.end   = c(ref_end, 12),
+                    na.rm = TRUE)$fitted)
     spei3_all  <- as.vector(spei(pixel_ts, 3,
-                    distribution = 'log-Logistic', na.rm = TRUE)$fitted)
+                    distribution = 'log-Logistic',
+                    ref.start = c(ref_start, 1),
+                    ref.end   = c(ref_end, 12),
+                    na.rm = TRUE)$fitted)
     spei12_all <- as.vector(spei(pixel_ts, 12,
-                    distribution = 'log-Logistic', na.rm = TRUE)$fitted)
+                    distribution = 'log-Logistic',
+                    ref.start = c(ref_start, 1),
+                    ref.end   = c(ref_end, 12),
+                    na.rm = TRUE)$fitted)
 
-    if (length(spei1_all) != 240) stop("Incorrect output length.")
+    if (length(spei1_all) != n_monthly) stop("Incorrect output length.")
 
     seasonal_idx <- which(((seq_along(spei3_all) - 1) %% 12 + 1) %in% c(3,6,9,12))
-    annual_idx   <- seq(12, 240, by = 12)
+    annual_idx   <- seq(12, n_monthly, by = 12)
 
     c(spei1_all, spei3_all[seasonal_idx], spei12_all[annual_idx])
 
-  }, error = function(e) rep(NA, 340))
+  }, error = function(e) rep(NA, n_output))
 }
 
 # --- Band names ---
-spei1_names  <- paste0('y', rep(2004:2023, each = 12),
-                        '_m', sprintf('%02d', rep(1:12, 20)))
-spei3_names  <- paste0('y', rep(2004:2023, each = 4),
-                        '_m', sprintf('%02d', rep(c(3,6,9,12), 20)))
-spei12_names <- paste0('y', 2004:2023)
+spei1_names  <- paste0('y', rep(start_year:end_year, each = 12),
+                        '_m', sprintf('%02d', rep(1:12, n_years)))
+spei3_names  <- paste0('y', rep(start_year:end_year, each = 4),
+                        '_m', sprintf('%02d', rep(c(3,6,9,12), n_years)))
+spei12_names <- paste0('y', start_year:end_year)
 
 # --- Find all input files ---
 input_files <- sort(list.files(input_dir,
@@ -98,7 +122,7 @@ for (input_file in input_files) {
 
   # Compute
   temp_file    <- file.path(output_dir, paste0(state_safe, "_temp.tif"))
-  result_brick <- brick(p_pet_brick, nl = 340)
+  result_brick <- brick(p_pet_brick, nl = n_output)
   result_brick <- writeStart(result_brick, filename = temp_file, overwrite = TRUE)
 
   bs <- blockSize(p_pet_brick)
@@ -113,9 +137,16 @@ for (input_file in input_files) {
   # Split and save
   all_b <- brick(temp_file)
 
-  spei1_b  <- all_b[[1:240]];   names(spei1_b)  <- spei1_names
-  spei3_b  <- all_b[[241:320]]; names(spei3_b)  <- spei3_names
-  spei12_b <- all_b[[321:340]]; names(spei12_b) <- spei12_names
+  spei1_end <- n_monthly
+spei3_end <- n_monthly + n_seasonal
+
+spei1_b  <- all_b[[1:spei1_end]]
+spei3_b  <- all_b[[(spei1_end + 1):spei3_end]]
+spei12_b <- all_b[[(spei3_end + 1):n_output]]
+
+names(spei1_b)  <- spei1_names
+names(spei3_b)  <- spei3_names
+names(spei12_b) <- spei12_names
 
   writeRaster(spei1_b,
               file.path(output_dir, paste0("SPEI1_",  state_safe, ".tif")),
